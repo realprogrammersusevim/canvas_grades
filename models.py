@@ -14,6 +14,7 @@ class AssignmentRecord:
 @dataclass
 class GroupRules:
     """Canvas assignment-group drop rules. See Canvas API `AssignmentGroup.rules`."""
+
     drop_lowest: int = 0
     drop_highest: int = 0
     never_drop: list[int] = field(default_factory=list)
@@ -42,6 +43,6 @@ class NeedScore:
     assignment_name: str
     points_possible: float
     min_score_needed: float  # absolute points
-    min_pct_needed: float    # as percentage (0-100)
-    is_impossible: bool      # even 100% won't reach target
+    min_pct_needed: float  # as percentage (0-100)
+    is_impossible: bool  # even 100% won't reach target
     max_achievable: float | None  # grade if this assignment scores 100%

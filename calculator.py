@@ -29,10 +29,12 @@ def _group_totals(group: GroupRecord) -> tuple[float, float]:
     n_high = min(rules.drop_highest, max(0, max_droppable - n_low))
 
     droppable.sort(key=lambda a: (a.score or 0.0) / a.points_possible)
-    kept = droppable[n_low: len(droppable) - n_high] if n_high else droppable[n_low:]
+    kept = droppable[n_low : len(droppable) - n_high] if n_high else droppable[n_low:]
 
     retained = kept + protected
-    earned = sum((a.score or 0.0) for a in retained) + sum((a.score or 0.0) for a in bonus)
+    earned = sum((a.score or 0.0) for a in retained) + sum(
+        (a.score or 0.0) for a in bonus
+    )
     possible = sum(a.points_possible for a in retained)
     return earned, possible
 
@@ -87,7 +89,10 @@ def compute_grade(course: CourseRecord) -> float | None:
 
 
 def _grade_with_score(
-    course: CourseRecord, target_group_id: int, target_assignment_id: int, hypothetical_score: float
+    course: CourseRecord,
+    target_group_id: int,
+    target_assignment_id: int,
+    hypothetical_score: float,
 ) -> float | None:
     """
     Returns the course grade as if the target assignment has hypothetical_score and is graded.
@@ -111,7 +116,12 @@ def _grade_with_score(
             else:
                 new_assignments.append(a)
         modified_groups.append(
-            GroupRecord(id=group.id, name=group.name, weight=group.weight, assignments=new_assignments)
+            GroupRecord(
+                id=group.id,
+                name=group.name,
+                weight=group.weight,
+                assignments=new_assignments,
+            )
         )
     modified_course = CourseRecord(
         id=course.id,
@@ -144,7 +154,12 @@ def min_score_needed(
         )
 
     g0 = _grade_with_score(course, target_group_id, assignment.id, 0.0) or 0.0
-    g_max = _grade_with_score(course, target_group_id, assignment.id, assignment.points_possible) or 0.0
+    g_max = (
+        _grade_with_score(
+            course, target_group_id, assignment.id, assignment.points_possible
+        )
+        or 0.0
+    )
 
     grade_range = g_max - g0
 
@@ -195,7 +210,12 @@ def compute_max_achievable(course: CourseRecord) -> float | None:
             else:
                 new_assignments.append(a)
         modified_groups.append(
-            GroupRecord(id=group.id, name=group.name, weight=group.weight, assignments=new_assignments)
+            GroupRecord(
+                id=group.id,
+                name=group.name,
+                weight=group.weight,
+                assignments=new_assignments,
+            )
         )
     modified_course = CourseRecord(
         id=course.id,
@@ -207,7 +227,53 @@ def compute_max_achievable(course: CourseRecord) -> float | None:
     return compute_grade(modified_course)
 
 
-def compute_all_needs(course: CourseRecord, target_grade: float) -> list[tuple[NeedScore, str]]:
+def apply_assumptions(
+    course: CourseRecord, assumed_scores: dict[int, float]
+) -> CourseRecord:
+    """
+    Returns a copy of course with the given assignment IDs pinned as graded with
+    the provided raw-point scores. Preserves group drop rules.
+    """
+    if not assumed_scores:
+        return course
+    modified_groups = []
+    for group in course.groups:
+        new_assignments = []
+        for a in group.assignments:
+            if a.id in assumed_scores:
+                new_assignments.append(
+                    AssignmentRecord(
+                        id=a.id,
+                        name=a.name,
+                        group_id=a.group_id,
+                        points_possible=a.points_possible,
+                        score=assumed_scores[a.id],
+                        is_graded=True,
+                    )
+                )
+            else:
+                new_assignments.append(a)
+        modified_groups.append(
+            GroupRecord(
+                id=group.id,
+                name=group.name,
+                weight=group.weight,
+                assignments=new_assignments,
+                rules=group.rules,
+            )
+        )
+    return CourseRecord(
+        id=course.id,
+        name=course.name,
+        is_weighted=course.is_weighted,
+        grading_type=course.grading_type,
+        groups=modified_groups,
+    )
+
+
+def compute_all_needs(
+    course: CourseRecord, target_grade: float
+) -> list[tuple[NeedScore, str]]:
     """
     Returns list of (NeedScore, group_name) for every ungraded assignment in the course.
     """

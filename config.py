@@ -18,9 +18,13 @@ def load_config() -> Config:
     api_token = os.environ.get("CANVAS_API_TOKEN", "").strip()
 
     if not api_url:
-        raise SystemExit("Error: CANVAS_API_URL is not set. Add it to .env or set it as an environment variable.")
+        raise SystemExit(
+            "Error: CANVAS_API_URL is not set. Add it to .env or set it as an environment variable."
+        )
     if not api_token:
-        raise SystemExit("Error: CANVAS_API_TOKEN is not set. Add it to .env or set it as an environment variable.")
+        raise SystemExit(
+            "Error: CANVAS_API_TOKEN is not set. Add it to .env or set it as an environment variable."
+        )
 
     target_raw = os.environ.get("TARGET_GRADE", "90.0").strip()
     try:

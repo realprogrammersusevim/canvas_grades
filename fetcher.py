@@ -27,12 +27,18 @@ def fetch_courses(canvas: Canvas, *, all_courses: bool = False) -> list[CourseRe
         canvas: Authenticated Canvas API client.
         all_courses: If True, fetch all active courses; otherwise fetch only favorited courses.
     """
-    raw_courses = canvas.get_courses(enrollment_state="active", include=["total_scores", "favorites"])
+    raw_courses = canvas.get_courses(
+        enrollment_state="active", include=["total_scores", "favorites"]
+    )
     if not all_courses:
         raw_courses = (c for c in raw_courses if getattr(c, "is_favorite", False))
 
     valid = [
-        (c, getattr(c, "grading_type", "points") or "points", bool(getattr(c, "apply_assignment_group_weights", False)))
+        (
+            c,
+            getattr(c, "grading_type", "points") or "points",
+            bool(getattr(c, "apply_assignment_group_weights", False)),
+        )
         for c in raw_courses
         if getattr(c, "name", None)
     ]
@@ -40,7 +46,9 @@ def fetch_courses(canvas: Canvas, *, all_courses: bool = False) -> list[CourseRe
     courses: list[CourseRecord] = []
     with ThreadPoolExecutor() as executor:
         futures = {
-            executor.submit(_build_course_record, course, grading_type, is_weighted): course
+            executor.submit(
+                _build_course_record, course, grading_type, is_weighted
+            ): course
             for course, grading_type, is_weighted in valid
         }
         for future in as_completed(futures):
@@ -53,7 +61,9 @@ def fetch_courses(canvas: Canvas, *, all_courses: bool = False) -> list[CourseRe
     return courses
 
 
-def _build_course_record(course: Course, grading_type: str, is_weighted: bool) -> CourseRecord:
+def _build_course_record(
+    course: Course, grading_type: str, is_weighted: bool
+) -> CourseRecord:
     # Fetch assignment groups (includes assignment IDs and group weights)
     raw_groups = list(course.get_assignment_groups(include=["assignments"]))
 
