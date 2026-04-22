@@ -12,11 +12,20 @@ class AssignmentRecord:
 
 
 @dataclass
+class GroupRules:
+    """Canvas assignment-group drop rules. See Canvas API `AssignmentGroup.rules`."""
+    drop_lowest: int = 0
+    drop_highest: int = 0
+    never_drop: list[int] = field(default_factory=list)
+
+
+@dataclass
 class GroupRecord:
     id: int
     name: str
     weight: float | None  # None means non-weighted course; stored as e.g. 30.0 for 30%
     assignments: list[AssignmentRecord] = field(default_factory=list)
+    rules: GroupRules = field(default_factory=lambda: GroupRules())
 
 
 @dataclass

@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from canvasapi import Canvas
 from canvasapi.course import Course
 
-from models import AssignmentRecord, CourseRecord, GroupRecord
+from models import AssignmentRecord, CourseRecord, GroupRecord, GroupRules
 
 
 def _get(obj: object, key: str, default: object = None) -> object:
@@ -18,12 +18,18 @@ def _is_graded(submission: object) -> bool:
     return state == "graded" and score is not None
 
 
-def fetch_courses(canvas: Canvas) -> list[CourseRecord]:
+def fetch_courses(canvas: Canvas, *, all_courses: bool = False) -> list[CourseRecord]:
     """
-    Fetches all active courses for the current user and returns CourseRecord objects
+    Fetches courses for the current user and returns CourseRecord objects
     with groups and assignments (including submission data) populated.
+
+    Args:
+        canvas: Authenticated Canvas API client.
+        all_courses: If True, fetch all active courses; otherwise fetch only favorited courses.
     """
-    raw_courses = canvas.get_courses(enrollment_state="active", include=["total_scores"])
+    raw_courses = canvas.get_courses(enrollment_state="active", include=["total_scores", "favorites"])
+    if not all_courses:
+        raw_courses = (c for c in raw_courses if getattr(c, "is_favorite", False))
 
     valid = [
         (c, getattr(c, "grading_type", "points") or "points", bool(getattr(c, "apply_assignment_group_weights", False)))
@@ -101,12 +107,20 @@ def _build_course_record(course: Course, grading_type: str, is_weighted: bool) -
                 )
             )
 
+        raw_rules = getattr(raw_group, "rules", {}) or {}
+        rules = GroupRules(
+            drop_lowest=int(raw_rules.get("drop_lowest", 0) or 0),
+            drop_highest=int(raw_rules.get("drop_highest", 0) or 0),
+            never_drop=[int(x) for x in (raw_rules.get("never_drop") or [])],
+        )
+
         groups.append(
             GroupRecord(
                 id=raw_group.id,
                 name=str(getattr(raw_group, "name", f"Group {raw_group.id}")),
                 weight=float(weight) if weight is not None else None,
                 assignments=assignments,
+                rules=rules,
             )
         )
 

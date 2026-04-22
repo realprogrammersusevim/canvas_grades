@@ -1,4 +1,4 @@
-from calculator import compute_all_needs, compute_grade
+from calculator import compute_all_needs, compute_grade, compute_max_achievable
 from models import CourseRecord, NeedScore
 
 _BAR = "─" * 52
@@ -70,13 +70,23 @@ def display_course(course: CourseRecord, target_grade: float) -> None:
     needs_work = [(n, g) for n, g in needs if not n.is_impossible and n.min_score_needed > 0]
     impossible = [(n, g) for n, g in needs if n.is_impossible]
 
-    print(f"  What you need (worst-case: other ungraded assignments score 0):")
+    # Only show impossible entries when there's no achievable path — otherwise they're noise.
+    # If needs_work items exist, the target is reachable and impossible entries are irrelevant.
     if needs_work:
+        print(f"  What you need (assuming other ungraded assignments maintain current averages):")
         for need, group_name in needs_work:
             _print_need_row(need, group_name)
-    if impossible:
-        for need, group_name in impossible:
-            _print_impossible_row(need, group_name)
+    elif impossible:
+        # No achievable path — check if target is truly unreachable even with all 100%
+        max_grade = compute_max_achievable(course)
+        if max_grade is not None and max_grade < target_grade:
+            print(f"  Target not achievable — max possible grade: {max_grade:.1f}%")
+        else:
+            # Target is reachable in aggregate but no single assignment can get you there alone
+            print(f"  What you need (assuming other ungraded assignments maintain current averages):")
+            for need, group_name in impossible:
+                _print_impossible_row(need, group_name)
+
     if already_covered:
         print(f"  Already on track (target met even if these score 0):")
         for need, group_name in already_covered:
