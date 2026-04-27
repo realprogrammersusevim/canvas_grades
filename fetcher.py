@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import cast
 
 from canvasapi import Canvas
 from canvasapi.course import Course
@@ -8,7 +9,7 @@ from models import AssignmentRecord, CourseRecord, GroupRecord, GroupRules
 
 def _get(obj: object, key: str, default: object = None) -> object:
     if isinstance(obj, dict):
-        return obj.get(key, default)
+        return cast(dict[str, object], obj).get(key, default)
     return getattr(obj, key, default)
 
 
@@ -81,7 +82,7 @@ def _build_course_record(
         assignments: list[AssignmentRecord] = []
         for stub in group_assignment_stubs:
             stub_id = _get(stub, "id")
-            if stub_id is None:
+            if not isinstance(stub_id, int):
                 continue
 
             full = assignment_map.get(stub_id)
