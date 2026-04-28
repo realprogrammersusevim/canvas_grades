@@ -1,7 +1,7 @@
 [project]
-name = "canvas-tools"
+name = "canvas-grades"
 version = "0.1.0"
-description = "Add your description here"
+description = "Forecast Canvas grades using API data"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
