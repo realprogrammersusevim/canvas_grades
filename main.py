@@ -2,9 +2,10 @@ import argparse
 
 from canvasapi import Canvas
 
+import cache
 from config import load_config
 from display import display_all
-from fetcher import fetch_courses
+from fetcher import fetch_courses, list_courses
 from models import CourseRecord
 
 
@@ -76,6 +77,19 @@ def main() -> None:
         help="Include all active courses instead of only favorited ones.",
     )
     parser.add_argument(
+        "--refresh",
+        action="store_true",
+        default=False,
+        help="Bypass the local cache and fetch fresh data from Canvas.",
+    )
+    parser.add_argument(
+        "--cache-ttl",
+        type=int,
+        default=cache.DEFAULT_TTL,
+        metavar="SECONDS",
+        help=f"Cache lifetime in seconds (default: {cache.DEFAULT_TTL}).",
+    )
+    parser.add_argument(
         "--assume",
         action="append",
         default=[],
@@ -93,8 +107,36 @@ def main() -> None:
     canvas = Canvas(config.api_url, config.api_token)
 
     scope = "all active" if args.all_courses else "favorited"
-    print(f"Fetching {scope} courses... (target grade: {config.target_grade:.1f}%)\n")
-    courses = fetch_courses(canvas, all_courses=args.all_courses)
+
+    # list_courses is a single fast API call that returns which courses are in scope.
+    course_stubs = list_courses(canvas, all_courses=args.all_courses)
+    course_ids = [c.id for c, _, _ in course_stubs]
+
+    cached_records: dict[int, CourseRecord] = {}
+    if not args.refresh and course_ids:
+        cached_records = cache.load_courses(config.api_url, course_ids, ttl=args.cache_ttl)
+
+    n_cached = len(cached_records)
+    n_total = len(course_ids)
+
+    if n_cached == n_total and n_total > 0:
+        print(
+            f"Using cached data for all {n_total} {scope} courses — "
+            f"run with --refresh to update.\n"
+            f"Target grade: {config.target_grade:.1f}%\n"
+        )
+    elif n_cached > 0:
+        print(
+            f"Fetching {scope} courses... ({n_cached}/{n_total} from cache, "
+            f"{n_total - n_cached} from Canvas)\n"
+            f"Target grade: {config.target_grade:.1f}%\n"
+        )
+    else:
+        print(f"Fetching {scope} courses... (target grade: {config.target_grade:.1f}%)\n")
+
+    courses, freshly_fetched = fetch_courses(course_stubs, cached=cached_records)
+    if freshly_fetched:
+        cache.save_courses(config.api_url, freshly_fetched)
 
     assumptions: dict[int, dict[int, float]] = {}
     for spec in args.assume:

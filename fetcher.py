@@ -19,14 +19,13 @@ def _is_graded(submission: object) -> bool:
     return state == "graded" and score is not None
 
 
-def fetch_courses(canvas: Canvas, *, all_courses: bool = False) -> list[CourseRecord]:
-    """
-    Fetches courses for the current user and returns CourseRecord objects
-    with groups and assignments (including submission data) populated.
+CourseStub = tuple[Course, str, bool]  # (raw_course, grading_type, is_weighted)
 
-    Args:
-        canvas: Authenticated Canvas API client.
-        all_courses: If True, fetch all active courses; otherwise fetch only favorited courses.
+
+def list_courses(canvas: Canvas, *, all_courses: bool = False) -> list[CourseStub]:
+    """
+    Returns a list of (raw_course, grading_type, is_weighted) for courses to include.
+    Single API call — used to determine which course IDs are needed before cache lookup.
     """
     raw_courses = canvas.get_courses(
         enrollment_state="active", include=["total_scores", "favorites"]
@@ -34,7 +33,7 @@ def fetch_courses(canvas: Canvas, *, all_courses: bool = False) -> list[CourseRe
     if not all_courses:
         raw_courses = (c for c in raw_courses if getattr(c, "is_favorite", False))
 
-    valid = [
+    return [
         (
             c,
             getattr(c, "grading_type", "points") or "points",
@@ -44,22 +43,43 @@ def fetch_courses(canvas: Canvas, *, all_courses: bool = False) -> list[CourseRe
         if getattr(c, "name", None)
     ]
 
-    courses: list[CourseRecord] = []
+
+def fetch_courses(
+    stubs: list[CourseStub],
+    *,
+    cached: dict[int, CourseRecord] | None = None,
+) -> tuple[list[CourseRecord], list[CourseRecord]]:
+    """
+    Returns (all_records, freshly_fetched). Courses whose IDs appear in `cached`
+    are returned as-is; the rest are fetched from Canvas in parallel.
+
+    Args:
+        stubs: Output of list_courses() — determines which courses are in scope.
+        cached: Pre-loaded cache entries keyed by course ID.
+    """
+    cached = cached or {}
+    result: list[CourseRecord] = list(cached.values())
+    freshly_fetched: list[CourseRecord] = []
+
+    to_fetch = [(c, gt, iw) for c, gt, iw in stubs if c.id not in cached]
+
     with ThreadPoolExecutor() as executor:
         futures = {
             executor.submit(
                 _build_course_record, course, grading_type, is_weighted
             ): course
-            for course, grading_type, is_weighted in valid
+            for course, grading_type, is_weighted in to_fetch
         }
         for future in as_completed(futures):
             course = futures[future]
             try:
-                courses.append(future.result())
+                record = future.result()
+                result.append(record)
+                freshly_fetched.append(record)
             except Exception as e:
                 print(f"  Warning: could not fetch data for '{course.name}': {e}")
 
-    return courses
+    return result, freshly_fetched
 
 
 def _build_course_record(
