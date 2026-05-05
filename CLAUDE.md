@@ -25,6 +25,8 @@ uv sync                 # Sync dependencies from lockfile
   assignment and recompute minimums. `SCORE` can be a percentage (`69.9%`) or
   raw points (`69.9`). Course and assignment match by case-insensitive substring.
   Repeatable.
+- `--show-completed`: Include courses where the target grade has already been
+  achieved. By default, completed courses are hidden.
 
 ## Environment Setup
 

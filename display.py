@@ -3,6 +3,7 @@ from calculator import (
     compute_all_needs,
     compute_grade,
     compute_max_achievable,
+    is_course_completed,
 )
 from models import CourseRecord, NeedScore
 
@@ -205,11 +206,15 @@ def display_all(
     courses: list[CourseRecord],
     target_grade: float,
     assumptions: dict[int, dict[int, float]] | None = None,
+    show_completed: bool = False,
 ) -> None:
     if not courses:
         print("No active courses found.")
         return
     assumptions = assumptions or {}
-    for course in courses:
+    courses_to_show = courses if show_completed else [
+        c for c in courses if not is_course_completed(c, target_grade)
+    ]
+    for course in courses_to_show:
         display_course(course, target_grade, assumptions.get(course.id))
     print(_BAR)

@@ -284,3 +284,17 @@ def compute_all_needs(
                 need = min_score_needed(course, group.id, assignment, target_grade)
                 results.append((need, group.name))
     return results
+
+
+def is_course_completed(course: CourseRecord, target_grade: float) -> bool:
+    """Returns True when every assignment is graded and the current grade meets the target."""
+    current = compute_grade(course)
+    if current is None:
+        return False
+    if current < target_grade:
+        return False
+    for group in course.groups:
+        for assignment in group.assignments:
+            if not assignment.is_graded:
+                return False
+    return True

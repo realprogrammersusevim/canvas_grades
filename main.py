@@ -101,6 +101,12 @@ def main() -> None:
             "substring. Repeatable. Example: --assume 'calc:midterm exam 2=69.9%%'"
         ),
     )
+    parser.add_argument(
+        "--show-completed",
+        action="store_true",
+        default=False,
+        help="Include courses where the target grade has already been achieved.",
+    )
     args = parser.parse_args()
 
     config = load_config()
@@ -146,7 +152,7 @@ def main() -> None:
             raise SystemExit(f"Error in --assume {spec!r}: {e}")
         assumptions.setdefault(course_id, {})[assignment_id] = score
 
-    display_all(courses, config.target_grade, assumptions)
+    display_all(courses, config.target_grade, assumptions, show_completed=args.show_completed)
 
 
 if __name__ == "__main__":
